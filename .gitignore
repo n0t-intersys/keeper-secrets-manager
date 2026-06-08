@@ -1,0 +1,18 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+
+# KSM config dumps / secrets — must never be committed
+keeper.ini
+*config*.json
+ksm-config.json
+.env
+.env.*
+
+# OS noise
+Thumbs.db
+.DS_Store
+
+# Local Claude Code settings (per-user, not for the team repo)
+.claude/
