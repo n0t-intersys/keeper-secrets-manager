@@ -213,6 +213,35 @@ in a file. Removal has two parts:
 > and look for the `KeeperSecretsManager` entry. `Remove-KSM.ps1` deletes it for
 > you.
 
+### Revoking a client device (admin) — authoritative cutoff
+Deleting the local config does **not** revoke access on its own. To guarantee a
+device/developer can never pull secrets again, revoke its **client device** in
+the Application. This is the step that actually matters for offboarding.
+
+**Vault UI**
+1. Open **Secrets Manager** → the **Application**.
+2. Go to the **Devices** (client devices) list.
+3. Find the device by its name/Short ID, click the **⋮ / remove** action, and
+   confirm. Access is cut immediately; other devices are unaffected.
+
+**Keeper Commander**
+```
+# 1. List the application's client devices to find the Client ID (Short ID):
+secrets-manager app get <APPLICATION NAME|APP UID>
+
+# 2a. Remove one device from a specific application:
+secrets-manager client remove --app <APP UID> --client <CLIENT ID>
+
+# 2b. Or revoke a client across ALL applications it belongs to:
+secrets-manager client revoke --client <CLIENT ID>
+```
+- Clients are identified by their **Client ID / Short ID**, shown in the
+  `app get` output.
+- Add `--force` to skip the confirmation prompt in scripts.
+
+> Offboarding order: revoke the client device first (cutoff), then have the
+> device run `Remove-KSM.ps1` for local cleanup.
+
 ---
 
 ## 7. Troubleshooting
