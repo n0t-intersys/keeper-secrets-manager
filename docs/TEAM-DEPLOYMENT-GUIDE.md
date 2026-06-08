@@ -38,7 +38,8 @@ lands in source control or a plaintext file.
 | Path | Role | Who touches it |
 |------|------|----------------|
 | `setup/Setup-KSM.ps1` | One-time device onboarding (install deps, redeem token, verify) | Each developer, once |
-| `ksm/bootstrap.py` | Redeems token → stores config in Credential Manager; `--verify` mode | Called by Setup-KSM.ps1 |
+| `setup/Remove-KSM.ps1` | Device teardown: delete config from Credential Manager (`-UninstallDeps` optional) | Offboarding/cleanup |
+| `ksm/bootstrap.py` | Redeems token → stores config in Credential Manager; `--verify` / `--remove` modes | Called by the setup scripts |
 | `ksm/ksm_client.py` | Python helper: `get_value`, `get_field`, `get_secret_by_title`, `get_secrets` | Imported by app code |
 | `ksm/__init__.py` | Re-exports the helper functions as the `ksm` package | — |
 | `ksm/config_store.py` | Credential Manager service/key names | — |
@@ -192,6 +193,25 @@ See `examples\KeeperKSM-Example.ps1` for a complete, runnable script.
   device** — access is cut immediately, others are unaffected.
 - **Rotate a secret value:** change it in the Vault; code picks up the new value
   on next fetch (no redeploy needed).
+
+### Removing KSM from a device (offboarding / cleanup)
+The redeemed config lives in **Windows Credential Manager** on each device, not
+in a file. Removal has two parts:
+
+1. **On the device** — delete the stored config:
+   ```powershell
+   .\setup\Remove-KSM.ps1                 # remove the config only
+   .\setup\Remove-KSM.ps1 -UninstallDeps  # also pip-uninstall the SDK + keyring
+   ```
+   This is idempotent and safe to run even if nothing is stored.
+
+2. **In the Vault (admin)** — remove this **client device** from the Application
+   so the config can never be used again, even if a copy leaked. This is the
+   authoritative revocation; the local step is just cleanup.
+
+> Manual check (no script): open **Credential Manager → Windows Credentials**
+> and look for the `KeeperSecretsManager` entry. `Remove-KSM.ps1` deletes it for
+> you.
 
 ---
 

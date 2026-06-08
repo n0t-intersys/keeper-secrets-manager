@@ -53,12 +53,33 @@ def verify():
     print(f"Success: this device can access {len(records)} record(s).")
 
 
+def remove():
+    """Delete the stored KSM config from Windows Credential Manager.
+
+    Idempotent: reports success even if nothing was stored.
+    """
+    existing = keyring.get_password(KEYRING_SERVICE, KEYRING_USERNAME)
+    if existing is None:
+        print("Nothing to remove: no KSM config found on this device.")
+        return
+    keyring.delete_password(KEYRING_SERVICE, KEYRING_USERNAME)
+    print("KSM config removed from Windows Credential Manager.")
+
+
 def main():
     if "--verify" in sys.argv[1:]:
         try:
             verify()
         except Exception as exc:
             print(f"ERROR: verification failed: {exc}", file=sys.stderr)
+            return 1
+        return 0
+
+    if "--remove" in sys.argv[1:]:
+        try:
+            remove()
+        except Exception as exc:
+            print(f"ERROR: failed to remove config: {exc}", file=sys.stderr)
             return 1
         return 0
 
