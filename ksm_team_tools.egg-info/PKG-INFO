@@ -1,0 +1,9 @@
+Metadata-Version: 2.4
+Name: ksm-team-tools
+Version: 0.1.0
+Summary: Team tooling to pull secrets from Keeper Secrets Manager at runtime instead of hard-coding them.
+Requires-Python: >=3.9
+License-File: LICENSE
+Requires-Dist: keeper-secrets-manager-core>=16.6.0
+Requires-Dist: keyring>=24.0.0
+Dynamic: license-file

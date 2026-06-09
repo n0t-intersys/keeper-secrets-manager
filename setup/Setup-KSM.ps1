@@ -27,7 +27,6 @@ $ErrorActionPreference = "Stop"
 $ScriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 $RepoRoot  = Split-Path -Parent $ScriptDir
 $KsmDir    = Join-Path $RepoRoot "ksm"
-$Requirements = Join-Path $RepoRoot "requirements.txt"
 
 Write-Host "=== Keeper Secrets Manager device setup ===" -ForegroundColor Cyan
 
@@ -40,10 +39,11 @@ if (-not $python) {
 $pythonExe = $python.Source
 Write-Host "Using Python: $pythonExe"
 
-# 2. Install dependencies. (No --user: it errors inside virtualenvs and isn't
-#    needed for a normal per-user Python install.)
-Write-Host "Installing dependencies from requirements.txt ..."
-& $pythonExe -m pip install --upgrade -r $Requirements
+# 2. Install the ksm package (editable) plus its dependencies. Editable means
+#    `import ksm` works from ANY directory and code edits take effect with no
+#    reinstall. Dependencies are declared in pyproject.toml.
+Write-Host "Installing the ksm package and dependencies (editable) ..."
+& $pythonExe -m pip install --upgrade -e $RepoRoot
 if ($LASTEXITCODE -ne 0) { throw "pip install failed." }
 
 # 3. Obtain the one-time token (masked prompt unless passed as a parameter).

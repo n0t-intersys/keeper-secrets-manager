@@ -47,7 +47,8 @@ lands in source control or a plaintext file.
 | `ksm/Ksm.psm1` | PowerShell module exposing `Get-KsmValue` | Imported by .ps1 scripts |
 | `examples/example_usage.py` | Python example | Reference |
 | `examples/KeeperKSM-Example.ps1` | PowerShell example | Reference |
-| `requirements.txt` | Python dependencies | Setup |
+| `pyproject.toml` | Package metadata + deps; enables `pip install -e .` (import-anywhere) | Setup |
+| `requirements.txt` | Python dependencies (mirrors pyproject) | Reference |
 
 ---
 
@@ -140,8 +141,10 @@ You only do this **once per device**. Re-run it any time you rotate your token.
   - Custom field (by its label): `<RecordUID>/custom_field/<label>`
 
 ### 5b. Python
-Place your script **inside the repo** (so `import ksm` resolves), or add the
-repo to `sys.path` (see Troubleshooting). Then:
+`Setup-KSM.ps1` installs the `ksm` package **editable** (`pip install -e .`), so
+`import ksm` works from **any directory** and code edits take effect with no
+reinstall. (If you skipped setup, run `pip install -e .` from the repo root.)
+Then:
 ```python
 from ksm import get_value, get_field, get_secret_by_title
 
@@ -250,7 +253,7 @@ secrets-manager client revoke --client <CLIENT ID>
 |--------|-------|-----|
 | `Python was not found; run without arguments to install from the Microsoft Store` | Windows App-execution alias hijacks `python` | Settings → Apps → Advanced app settings → App execution aliases → turn OFF `python.exe`/`python3.exe`; reopen shell |
 | `pip install failed` | Python/pip missing, proxy/SSL inspection, or `--user` conflict | `python -m ensurepip --upgrade`; behind proxy add `--proxy`; install without `--user` |
-| `ModuleNotFoundError: No module named 'ksm'` | Script runs from outside the repo so the `ksm` package isn't on `sys.path` | Put the script inside the repo, **or** `setx`/`$env:PYTHONPATH` to the repo root, **or** add `sys.path.insert(0, r"C:\path\to\keeper-secrets-manager")` at the top |
+| `ModuleNotFoundError: No module named 'ksm'` | The editable install didn't run, or you're using a different Python than setup did | From the repo root: `python -m pip install -e .` (confirm it's the same `python` you run scripts with) |
 | `Get-KsmValue : The term ... is not recognized` | The module wasn't imported in that script/session | Add `Import-Module "...\ksm\Ksm.psm1" -Force` before calling it |
 | `Verification failed` / `KSM lookup failed` | Token expired/already used, IP-locked to another network, or wrong RecordUID | Re-issue token (+`--unlock-ip` if roaming); confirm the UID is one your Application was granted |
 | `...cannot be loaded because running scripts is disabled` | Execution policy blocks .ps1 | `Set-ExecutionPolicy -Scope CurrentUser RemoteSigned` |
