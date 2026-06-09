@@ -1,2 +1,0 @@
-keeper-secrets-manager-core>=16.6.0
-keyring>=24.0.0
