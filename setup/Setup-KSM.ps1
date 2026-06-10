@@ -18,7 +18,10 @@
 [CmdletBinding()]
 param(
     # Optionally pass the token non-interactively (e.g. for scripted setup).
-    [string]$Token
+    [string]$Token,
+
+    # Skip adding the Get-KsmValue auto-import to the PowerShell profile.
+    [switch]$NoProfileImport
 )
 
 $ErrorActionPreference = "Stop"
@@ -31,12 +34,20 @@ $KsmDir    = Join-Path $RepoRoot "ksm"
 Write-Host "=== Keeper Secrets Manager device setup ===" -ForegroundColor Cyan
 
 # 1. Locate Python (works on Windows PowerShell 5.1 and PowerShell 7+).
-$python = Get-Command python -ErrorAction SilentlyContinue
-if (-not $python) { $python = Get-Command python3 -ErrorAction SilentlyContinue }
-if (-not $python) {
-    throw "Python 3.9+ is required but was not found on PATH. Install it from https://www.python.org/downloads/windows/ and re-run."
+$pythonExe = $null
+$cmd = Get-Command python -ErrorAction SilentlyContinue
+if (-not $cmd) { $cmd = Get-Command python3 -ErrorAction SilentlyContinue }
+if ($cmd) { $pythonExe = $cmd.Source }
+if (-not $pythonExe) {
+    # Fallback: per-user python.org install location. PATH may not be refreshed
+    # yet when this runs right after a silent install (e.g. from the installer).
+    $cand = Get-ChildItem "$env:LOCALAPPDATA\Programs\Python\Python*\python.exe" -ErrorAction SilentlyContinue |
+            Sort-Object FullName -Descending | Select-Object -First 1
+    if ($cand) { $pythonExe = $cand.FullName }
 }
-$pythonExe = $python.Source
+if (-not $pythonExe) {
+    throw "Python 3.9+ is required but was not found. Install it from https://www.python.org/downloads/windows/ and re-run."
+}
 Write-Host "Using Python: $pythonExe"
 
 # 2. Install the ksm package (editable) plus its dependencies. Editable means
@@ -76,6 +87,25 @@ Write-Host "Verifying access ..."
 & $pythonExe (Join-Path $KsmDir "bootstrap.py") --verify
 if ($LASTEXITCODE -ne 0) { throw "Verification failed." }
 
+# 6. Make Get-KsmValue available in every new PowerShell session (idempotent).
+#    Adds an Import-Module line to the user's profile so PowerShell consumers
+#    don't have to import the module manually. Skip with -NoProfileImport.
+if (-not $NoProfileImport) {
+    $modulePath  = Join-Path $KsmDir "Ksm.psm1"
+    $profilePath = $PROFILE.CurrentUserAllHosts
+    if (-not (Test-Path $profilePath)) {
+        New-Item -ItemType File -Path $profilePath -Force | Out-Null
+    }
+    $already = Select-String -Path $profilePath -SimpleMatch $modulePath -Quiet -ErrorAction SilentlyContinue
+    if (-not $already) {
+        Add-Content -Path $profilePath -Value "Import-Module `"$modulePath`""
+        Write-Host "Registered KSM module auto-import in your PowerShell profile."
+    } else {
+        Write-Host "KSM module auto-import already present in your PowerShell profile."
+    }
+}
+
 Write-Host ""
 Write-Host "Done. Your team's code can now read secrets without the token." -ForegroundColor Green
 Write-Host "Examples: examples\example_usage.py (Python), examples\KeeperKSM-Example.ps1 (PowerShell)." -ForegroundColor Green
+Write-Host "Open a NEW PowerShell window, then 'Get-KsmValue' is available everywhere." -ForegroundColor Green

@@ -8,6 +8,11 @@ __pycache__/
 build/
 dist/
 
+# Installer build outputs (downloaded Python + compiled .exe)
+installer/vendor/
+installer/Output/
+*.exe
+
 # KSM config dumps / secrets — must never be committed
 keeper.ini
 *config*.json
