@@ -31,44 +31,23 @@ $KsmDir    = Join-Path $RepoRoot "ksm"
 
 Write-Host "=== Keeper Secrets Manager device removal ===" -ForegroundColor Cyan
 
-# Locate Python (PATH first, then per-user python.org install).
-$pythonExe = $null
-$cmd = Get-Command python -ErrorAction SilentlyContinue
-if (-not $cmd) { $cmd = Get-Command python3 -ErrorAction SilentlyContinue }
-if ($cmd) { $pythonExe = $cmd.Source }
-if (-not $pythonExe) {
-    $cand = Get-ChildItem "$env:LOCALAPPDATA\Programs\Python\Python*\python.exe" -ErrorAction SilentlyContinue |
-            Sort-Object FullName -Descending | Select-Object -First 1
-    if ($cand) { $pythonExe = $cand.FullName }
+# Locate Python.
+$python = Get-Command python -ErrorAction SilentlyContinue
+if (-not $python) { $python = Get-Command python3 -ErrorAction SilentlyContinue }
+if (-not $python) {
+    throw "Python was not found on PATH; cannot reach the credential store to remove the config."
 }
+$pythonExe = $python.Source
 
-# Delete the config entry from Windows Credential Manager (best-effort, so an
-# uninstall never hard-fails on a cleanup step).
-if ($pythonExe) {
-    Write-Host "Removing KSM config from Windows Credential Manager ..."
-    & $pythonExe (Join-Path $KsmDir "bootstrap.py") --remove
-    if ($LASTEXITCODE -ne 0) {
-        Write-Warning "Could not remove the config automatically. Delete the 'KeeperSecretsManager' entry in Windows Credential Manager manually."
-    }
-    if ($UninstallDeps) {
-        Write-Host "Uninstalling Python dependencies ..."
-        & $pythonExe -m pip uninstall -y keeper-secrets-manager-core keyring
-    }
-} else {
-    Write-Warning "Python not found. Remove the 'KeeperSecretsManager' entry in Windows Credential Manager manually (Control Panel > Credential Manager > Windows Credentials)."
-}
+# Delete the config entry from Windows Credential Manager.
+Write-Host "Removing KSM config from Windows Credential Manager ..."
+& $pythonExe (Join-Path $KsmDir "bootstrap.py") --remove
+if ($LASTEXITCODE -ne 0) { throw "Failed to remove KSM config." }
 
-# Remove the auto-import line from the PowerShell profile so new shells don't
-# try to import a module that may no longer exist.
-$modulePath  = Join-Path $KsmDir "Ksm.psm1"
-$profilePath = $PROFILE.CurrentUserAllHosts
-if (Test-Path $profilePath) {
-    $lines = @(Get-Content $profilePath)
-    $kept  = @($lines | Where-Object { $_ -notlike "*$modulePath*" })
-    if ($kept.Count -ne $lines.Count) {
-        Set-Content -Path $profilePath -Value $kept
-        Write-Host "Removed KSM module auto-import from your PowerShell profile."
-    }
+# Optionally remove the Python dependencies.
+if ($UninstallDeps) {
+    Write-Host "Uninstalling Python dependencies ..."
+    & $pythonExe -m pip uninstall -y keeper-secrets-manager-core keyring
 }
 
 Write-Host ""

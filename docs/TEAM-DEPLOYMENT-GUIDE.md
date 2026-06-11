@@ -49,9 +49,6 @@ lands in source control or a plaintext file.
 | `examples/KeeperKSM-Example.ps1` | PowerShell example | Reference |
 | `pyproject.toml` | Package metadata + deps; enables `pip install -e .` (import-anywhere) | Setup |
 | `requirements.txt` | Python dependencies (mirrors pyproject) | Reference |
-| `installer/ksm-setup.iss` | Inno Setup script for the one-click `.exe` installer | Build |
-| `installer/build.ps1` | Builds the installer locally (downloads Python, runs ISCC) | Build |
-| `.github/workflows/build-installer.yml` | CI: builds the installer; attaches it to tagged releases | Build |
 
 ---
 
@@ -88,13 +85,6 @@ secrets-manager client add --app "Team App"     # prints a one-time token; repea
 
 ## 4. Developer: one-time device setup
 
-> **Two ways to onboard:**
-> - **Easiest — the installer:** double-click `KSM-Setup-<ver>.exe` (see
->   [§8](#8-one-click-installer-exe)). It installs Python if needed, sets
->   everything up, and prompts for your token. Skip 4a–4c.
-> - **Manual — the scripts:** follow 4a–4c below (useful if you already manage
->   Python yourself or can't run the installer).
-
 ### 4a. Install Python (if not already present)
 Option A — winget (built into Windows 11):
 ```powershell
@@ -123,11 +113,10 @@ From the repo root:
 .\setup\Setup-KSM.ps1
 ```
 The script will:
-1. Install the `ksm` package + deps (`pip install -e .`) so `import ksm` works anywhere.
+1. Install Python deps from `requirements.txt`.
 2. Prompt for your one-time token (input is masked).
 3. Redeem it and store the config in **Windows Credential Manager**.
 4. Verify by listing the records your Application can access.
-5. Register `Get-KsmValue` in your PowerShell profile (use `-NoProfileImport` to skip).
 
 Expected output:
 ```
@@ -277,51 +266,7 @@ python .\ksm\get.py "RecordUID/field/password"
 
 ---
 
-## 8. One-click installer (.exe)
-
-A double-click installer that needs **no pre-installed Python** and runs the
-whole onboarding. Built with Inno Setup; bundles the official python.org
-installer.
-
-### What it does (per-user, no admin)
-1. Installs Python silently (per-user) **only if** none is found on the device.
-2. Lays the tooling down under `%LOCALAPPDATA%\Programs\KSM`.
-3. Runs `Setup-KSM.ps1` in a visible console — you paste your one-time token.
-4. Stores the config in **Windows Credential Manager** (as the logged-in user).
-5. Uninstalling runs `Remove-KSM.ps1` (clears the credential + profile import).
-
-> **Per-user by design.** The token redeem is a Credential Manager (DPAPI)
-> write that must run as the interactive user, so the installer never elevates
-> or offers an "all users" option. Don't repackage it for SYSTEM/silent
-> machine-wide deployment, or the secret lands under the wrong account.
-
-### Building the installer
-Prerequisite: [Inno Setup 6](https://jrsoftware.org/isdl.php) installed.
-```powershell
-.\installer\build.ps1                      # downloads Python, compiles the .exe
-.\installer\build.ps1 -PythonVersion 3.12.8
-```
-Output: `installer\Output\KSM-Setup-0.1.0.exe`.
-
-CI builds it too: the **Build installer** GitHub Action runs on demand
-(`workflow_dispatch`) and on version tags (`v*`), attaching the `.exe` to the
-GitHub Release. To cut a release:
-```powershell
-git tag v0.1.0
-git push origin v0.1.0
-```
-
-### Installing (end users) — SmartScreen note
-The installer is **unsigned**, so Windows SmartScreen will show
-**"Windows protected your PC / unknown publisher"** on first run. To proceed:
-**More info → Run anyway.** (This is expected for an internal, unsigned build.
-To remove the warning entirely you'd Authenticode-sign the `.exe` with a code-
-signing certificate.) Antivirus may also scrutinize it because it touches
-Credential Manager — allow it if flagged.
-
----
-
-## 9. Rollout checklist
+## 8. Rollout checklist
 
 **Admin**
 - [ ] Create the KSM Application and grant the needed records (read-only).
