@@ -44,7 +44,9 @@ lands in source control or a plaintext file.
 | `ksm/__init__.py` | Re-exports the helper functions as the `ksm` package | — |
 | `ksm/config_store.py` | Credential Manager service/key names | — |
 | `ksm/get.py` | Tiny CLI bridge so PowerShell can fetch one value | Called by Ksm.psm1 |
+| `ksm/gen_env.py` | Generate a `.env` from a template by resolving Keeper notation | Run when you need a `.env` |
 | `ksm/Ksm.psm1` | PowerShell module exposing `Get-KsmValue` | Imported by .ps1 scripts |
+| `.env.template` | Committed map of env vars → Keeper notation (no secrets) | Edit with your records |
 | `examples/example_usage.py` | Python example | Reference |
 | `examples/KeeperKSM-Example.ps1` | PowerShell example | Reference |
 | `pyproject.toml` | Package metadata + deps; enables `pip install -e .` (import-anywhere) | Setup |
@@ -172,6 +174,58 @@ $securePw = Get-KsmValue "RecordUID/field/password" -AsSecureString
 $cred = New-Object System.Management.Automation.PSCredential("svc_user", $securePw)
 ```
 See `examples\KeeperKSM-Example.ps1` for a complete, runnable script.
+
+### 5d. Generate a `.env` file
+For apps that read config from environment variables, generate a `.env` from a
+committed template. `.env.template` maps env vars to Keeper notation (no secrets
+in it); the generator resolves them:
+
+```
+# .env.template  (committed — references only)
+APP_ENV=production                                   # literal, passed through
+DB_USERNAME=keeper://RecordUID/field/login           # resolved from Keeper
+DB_PASSWORD=keeper://RecordUID/field/password
+API_KEY=keeper://RecordUID/custom_field/API Key
+```
+
+Generate the real `.env`:
+```powershell
+python ksm\gen_env.py                       # .env.template -> .env
+python ksm\gen_env.py --out C:\myapp\.env   # write to your app's folder
+python ksm\gen_env.py --force               # overwrite an existing .env
+```
+- Lines with `keeper://` are pulled from Keeper; everything else is copied
+  literally. Resolved values are double-quoted/escaped.
+- **The generated `.env` holds plaintext secrets.** It is gitignored — never
+  commit it. Prefer regenerating it over storing it long-term.
+- **Cloud-sync guard:** the generator **refuses** to write into a OneDrive
+  (cloud-synced) folder, so your secrets aren't uploaded. Point `--out` at a
+  local, non-synced path (e.g. your app directory). `--allow-cloud-sync`
+  overrides this, but don't.
+
+Consume the `.env`:
+```python
+# Python:  pip install python-dotenv
+from dotenv import load_dotenv; import os
+load_dotenv()                     # loads .env from cwd
+db_pw = os.environ["DB_PASSWORD"]
+```
+```powershell
+# PowerShell: load .env into the current session
+Get-Content .env | Where-Object { $_ -match '^\s*[^#].*=' } | ForEach-Object {
+    $k,$v = $_ -split '=',2
+    Set-Item "Env:$($k.Trim())" ($v.Trim().Trim('"'))
+}
+```
+```bash
+# Docker: pass it straight in
+docker run --env-file .env myimage
+```
+
+> Trade-off: a `.env` writes decrypted secrets to disk, which is a step down
+> from the in-code `get_value()` path (secrets stay in Credential Manager and
+> are fetched on demand). Use `.env` only when an app can't call the SDK
+> directly; delete/regenerate rather than letting it linger.
 
 ---
 
